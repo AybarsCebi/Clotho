@@ -30,7 +30,7 @@ class _MenuState extends State<Menu> {
     HomePage(),
     ExplorePage(),
     AddPage(),
-    MiniBlogPage(),
+    //MiniBlogPage(),
     AccountPage()
   ];
 
@@ -60,11 +60,11 @@ class _MenuState extends State<Menu> {
                 size: 27,
                 color: bckgrd,
               ),
-              Icon(
+              /*Icon(
                 Icons.library_books,
                 size: 27,
                 color: bckgrd,
-              ),
+              ),*/
               Icon(
                 Icons.account_circle_sharp,
                 size: 27,

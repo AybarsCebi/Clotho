@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:modaapp/BottomNavigationBar.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:modaapp/LoginPage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,7 +35,7 @@ class _MainAppState extends State<MainApp> {
       theme: ThemeData(
           //primaryColor: Colors.purple[200],
           ),
-      home: Menu(),
+      home: LoginPage()
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+
 class Post{
   String contenturl, outfitaccesories, outfitlower, outfitshoes, outfitupper, profilephotourl, username;
   double commentnumber, iconnumber, likenumber;
@@ -25,3 +26,24 @@ class HomePagePostModel{
     return homepageposts;
   }
 }
+
+Future<void> addUserToFirebase(String username, String email, String uid) async {
+  try {
+    await FirebaseFirestore.instance.collection('users').doc(uid).set({
+      'username': username,
+      'email': email,
+      'createdAt': FieldValue.serverTimestamp(),
+      'followers': [],
+      'following': [],
+      'posts': [],
+      'dailies': [],
+      'saved': [],
+      'profilepic': "",
+      'personalDescription': "ilk hesap"
+    });
+    debugPrint("✅ Kullanıcı Firestore'a başarıyla eklendi.");
+  } catch (e) {
+    debugPrint("❌ Firestore'a eklenirken hata oluştu: $e");
+  }
+}
+

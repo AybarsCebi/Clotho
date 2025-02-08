@@ -1,5 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:modaapp/AddPage.dart';
 import 'package:modaapp/ExplorePage.dart';
 import 'package:modaapp/HomePage.dart';
@@ -15,189 +16,145 @@ class AccountPage extends StatefulWidget {
 }
 
 class _AccountPageState extends State<AccountPage> {
-  int _currentindex = 4;
-  var pages = [
-    HomePage(),
-    ExplorePage(),
-    AddPage(),
-    MiniBlogPage(),
-    AccountPage()
-  ];
+  int _currentindex = 3;
+  var pages = [HomePage(), ExplorePage(), AddPage(), AccountPage()];
+
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  User? _user;
+  Map<String, dynamic>? _userData;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    _user = _auth.currentUser;
+    if (_user != null) {
+      DocumentSnapshot userDoc =
+          await _firestore.collection('users').doc(_user!.uid).get();
+      if (userDoc.exists) {
+        setState(() {
+          _userData = userDoc.data() as Map<String, dynamic>?;
+        });
+        debugPrint("Posts: ${_userData?['posts']}");
+      }
+    }
+  }
+
+  Future<void> logOut() async {
+    try {
+      await _auth.signOut();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => LoginPage()),
+      );
+    } catch (e) {
+      print("Error: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    double sc_height = (MediaQuery.of(context).size.height);
-    double sc_width = (MediaQuery.of(context).size.width);
+    double sc_height = MediaQuery.of(context).size.height;
+    double sc_width = MediaQuery.of(context).size.width;
 
     return SafeArea(
-        child: Scaffold(
-      backgroundColor: bckgrd,
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: sc_height / 50,
-            ),
-            Align(
-              alignment: Alignment.center,
-              child: Text(
-                "@username",
-                style: TextStyle(fontSize: 18),
-              ),
-            ),
-                
-            SizedBox(
-              height: sc_height / 50,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                CircleAvatar(
-                  radius: sc_height / 14,
-                  backgroundImage: const AssetImage('images/clothoapp.png'),
-                ),
-                Text(
-                  "218\n Followers",
-                  textAlign: TextAlign.center,
-                ),
-                Text(
-                  "18\n Contents",
-                  textAlign: TextAlign.center,
-                ),
-                Text(
-                  "175\n Followings",
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-            SizedBox(
-              height: sc_height / 50,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => LoginPage(),
+      child: Scaffold(
+        backgroundColor: bckgrd,
+        body: _userData == null
+            ? Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: sc_height / 50),
+                    Align(
+                      alignment: Alignment.center,
+                      child: Text(
+                        _userData!['username'],
+                        style: TextStyle(fontSize: 18),
+                      ),
                     ),
-                  );
-                  },
-                  child: Text("Follow"),
-                  style: ButtonStyle(
-                      backgroundColor: MaterialStatePropertyAll(darkcolor),
-                      foregroundColor: MaterialStatePropertyAll(bckgrd),
-                      overlayColor: MaterialStatePropertyAll(Colors.black),
-                      fixedSize: MaterialStatePropertyAll(
-                          Size(sc_width / 3, sc_height / 30))),
-                ),
-                TextButton(
-                  onPressed: () {},
-                  child: Text("Message"),
-                  style: ButtonStyle(
-                      backgroundColor: MaterialStatePropertyAll(darkcolor),
-                      foregroundColor: MaterialStatePropertyAll(bckgrd),
-                      overlayColor: MaterialStatePropertyAll(Colors.black),
-                      fixedSize: MaterialStatePropertyAll(
-                          Size(sc_width / 3, sc_height / 30))),
-                ),
-                TextButton(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (BuildContext context) {
-                        return AlertDialog(
-                          scrollable: true,
-                          title: Text(
-                            "@username",
-                            style: TextStyle(fontSize: 20, color: darkcolor),
+                    SizedBox(height: sc_height / 50),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        CircleAvatar(
+                          radius: sc_height / 14,
+                          backgroundImage: _userData!['profilepic'] != null &&
+                                  _userData!['profilepic'].isNotEmpty
+                              ? NetworkImage(_userData!['profilepic'])
+                              : AssetImage("images/clothoapp.png")
+                                  as ImageProvider,
+                        ),
+                        Text(
+                            "${(_userData!['followers']?.length ?? 0)}\n Followers",
+                            textAlign: TextAlign.center),
+                        Text("${_userData!['posts']?.length ?? 0}\n Posts",
+                            textAlign: TextAlign.center),
+                        Text(
+                            "${_userData!['following']?.length ?? 0}\n Followings",
+                            textAlign: TextAlign.center),
+                      ],
+                    ),
+                    SizedBox(height: sc_height / 100),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        TextButton(
+                          onPressed: logOut,
+                          style: ButtonStyle(
+                            backgroundColor:
+                                WidgetStatePropertyAll(darkcolor),
+                            foregroundColor: WidgetStatePropertyAll(bckgrd),
                           ),
-                          content: Padding(
-                            padding: const EdgeInsets.all(4.0),
-                            child: Column(
-                              children: [
-                                Text(
-                                  "Height: 175",
-                                ),
-                                Text(
-                                  "Weight: 54",
-                                ),
-                                Text(
-                                  "Size: S",
-                                ),
-                                Text(
-                                  "Horoscope: Sagittarius",
-                                ),
-                              ],
-                            ),
+                          child: Text("Log Out"),
+                        ),
+                      ],
+                    ),
+                    Divider(
+                      color: darkcolor,
+                      thickness: 0.5,
+                    ),
+                    GridView.count(
+                      mainAxisSpacing: sc_width/100,
+                      crossAxisSpacing: sc_width/100,
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      crossAxisCount: 3,
+                      childAspectRatio: 0.6,
+                      children:
+                          (_userData!['posts'] ?? []).map<Widget>((photoUrl) {
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            photoUrl,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return const Center(
+                                  child: CircularProgressIndicator());
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              print(
+                                  "Resim yüklenemedi: $error"); // Hata mesajı ekleme
+                              return Container(
+                                color: Colors.grey,
+                                child: const Icon(Icons.broken_image,
+                                    color: Colors.white),
+                              );
+                            },
                           ),
-                          actions: [
-                            TextButton(
-                              style: ButtonStyle(
-                                overlayColor: MaterialStatePropertyAll(
-                                    Colors.transparent),
-                              ),
-                              child: Text(
-                                "Continue",
-                                style:
-                                    TextStyle(fontSize: 20, color: darkcolor),
-                              ),
-                              onPressed: () {
-                                Navigator.pop(context);
-                              },
-                            ),
-                          ],
                         );
-                      },
-                    );
-                  },
-                  child: Icon(Icons.info),
-                  style: ButtonStyle(
-                      backgroundColor: MaterialStatePropertyAll(darkcolor),
-                      foregroundColor: MaterialStatePropertyAll(bckgrd),
-                      overlayColor: MaterialStatePropertyAll(Colors.black),
-                      fixedSize: MaterialStatePropertyAll(
-                          Size(sc_width / 10, sc_height / 30))),
-                ),
-              ],
-            ),
-
-            /*GridView.builder(
-                  padding: EdgeInsets.fromLTRB(0, 0, 0, 0),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    mainAxisSpacing: 2.0,
-                    crossAxisSpacing: 2.0,
-                      crossAxisCount: 3),
-                  itemBuilder: (context, index) {
-                    return Container(height: sc_height/2, width: sc_width/4, color: Colors.amber,);
-                  },
-                  itemCount: 13,
-                ),*/
-            
-            GridView.count(
-              mainAxisSpacing: 2.0,
-              crossAxisSpacing: 2.0,
-              shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
-              crossAxisCount: 3,
-              childAspectRatio: 0.6,
-              children: List.generate(
-                14,
-                (index) => Container(
-                  //height: sc_height/2,
-                  decoration: BoxDecoration(
-                    color: Colors.grey,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  
+                      }).toList(),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
-        ),
       ),
-    ));
+    );
   }
 }

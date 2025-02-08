@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:modaapp/AccountPage.dart';
 import 'package:modaapp/AddPage.dart';
@@ -168,7 +169,7 @@ class _HomePageState extends State<HomePage> {
   ];
 
   Widget unlike = const Icon(
-    Icons.favorite_outline,
+    Icons.favorite_border_outlined,
     color: Colors.white,
   );
   Widget like = const Icon(
@@ -327,7 +328,7 @@ class _HomePageState extends State<HomePage> {
                               TextButton(
                                 onPressed: () {},
                                 style: const ButtonStyle(
-                                  overlayColor: MaterialStatePropertyAll(
+                                  overlayColor: WidgetStatePropertyAll(
                                       Colors.transparent),
                                 ),
                                 child: Text(
@@ -346,7 +347,7 @@ class _HomePageState extends State<HomePage> {
                                   });
                                 },
                                 style: const ButtonStyle(
-                                  overlayColor: MaterialStatePropertyAll(
+                                  overlayColor: WidgetStatePropertyAll(
                                       Colors.transparent),
                                 ),
                                 child: (HomePagePosts[index].isfollow == false)
@@ -355,7 +356,7 @@ class _HomePageState extends State<HomePage> {
                                         style: TextStyle(color: Colors.black),
                                       )
                                     : const Text(
-                                        "Followed",
+                                        "Following",
                                         style: TextStyle(color: Colors.black),
                                       ),
                               )
@@ -364,57 +365,61 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                       Stack(children: [
-                        Container(
-                          decoration: BoxDecoration(
-                              borderRadius: const BorderRadius.only(
-                                  bottomLeft: Radius.circular(16),
-                                  bottomRight: Radius.circular(16)),
-                              image: DecorationImage(
-                                  image: NetworkImage(
-                                      HomePagePosts[index].contenturl),
-                                  //image: AssetImage("images/ticklogo.png"),
-                                  fit: BoxFit.cover)),
-                          width: (MediaQuery.of(context).size.width) *
-                              9.4 /
-                              10, //eskisi 9.5
-                          height:
-                              (MediaQuery.of(context).size.height) * 6.4 / 10,
-                          child: FilledButton(
-                            onPressed: () {},
-                            onLongPress: () {
-                              setState(() {
-                                updatelike(
-                                    HomePagePosts[index].id,
-                                    HomePagePosts[index].likenumber,
-                                    HomePagePosts[index].islike);
-                              });
-                            },
-                            child: null,
-                            style: ButtonStyle(
-                              backgroundColor: const MaterialStatePropertyAll(
-                                  Colors.transparent),
-                              shape: MaterialStateProperty.all(
-                                RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(5.0),
+                        Center(
+                          child: Container(
+                            decoration: BoxDecoration(
+                                borderRadius: const BorderRadius.only(
+                                    bottomLeft: Radius.circular(16),
+                                    bottomRight: Radius.circular(16)),
+                                image: DecorationImage(
+                                    image: NetworkImage(
+                                        HomePagePosts[index].contenturl),
+                                    //image: AssetImage("images/ticklogo.png"),
+                                    fit: BoxFit.cover)),
+                            width: (MediaQuery.of(context).size.width) *
+                                9.4 /
+                                10, //eskisi 9.5
+                            height:
+                                (MediaQuery.of(context).size.height) * 6.4 / 10,
+                            child: FilledButton(
+                              onPressed: () {},
+                              onLongPress: () {
+                                setState(() {
+                                  updatelike(
+                                      HomePagePosts[index].id,
+                                      HomePagePosts[index].likenumber,
+                                      HomePagePosts[index].islike);
+                                });
+                              },
+                              child: null,
+                              style: ButtonStyle(
+                                backgroundColor: const WidgetStatePropertyAll(
+                                    Colors.transparent),
+                                shape: WidgetStateProperty.all(
+                                  RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(5.0),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
                         Padding(
-                          padding: EdgeInsets.fromLTRB(sc_width * 7.9 / 10,
-                              sc_height / 80, 0, 0), //eskisi 8
+                          padding: EdgeInsets.fromLTRB(sc_width * 8.5 / 10,
+                              sc_height / 100, 0, 0), //eskisi 8
                           child: IconButton(
                             onPressed: () {
                               setState(() {
                                 saved = !saved;
                               });
                             },
-                            icon: Image.asset(
-                              'images/savedicon.png',
-                              color: Colors.white,
+                            icon: SizedBox(
+                              height: sc_width / 12,
+                              child: Image.asset(
+                                'images/savedicon.png',
+                                color: Colors.white,
+                              ),
                             ),
-                            iconSize: 25,
                           ),
                         ),
                         /*Padding(                                                       //play button
@@ -445,7 +450,7 @@ class _HomePageState extends State<HomePage> {
                       ),*/
 
                         Padding(
-                          padding: EdgeInsets.fromLTRB(sc_width * 7.9 / 10,
+                          padding: EdgeInsets.fromLTRB(sc_width * 8.2 / 10,
                               sc_height / 6.6, 0, 0), //eskisi 8
                           child: Container(
                             width: sc_width / 8,
@@ -482,42 +487,56 @@ class _HomePageState extends State<HomePage> {
                                   iconSize: 25,
                                   onPressed: () {
                                     showModalBottomSheet(
-                                        backgroundColor: Colors.white,
-                                        shape: const BeveledRectangleBorder(
-                                            borderRadius: BorderRadius.only(
-                                                topLeft: Radius.circular(10),
-                                                topRight: Radius.circular(10))),
-                                        context: context,
-                                        builder: (BuildContext context) {
-                                          return SizedBox(
-                                            height: sc_height / 2,
-                                            child: Column(
-                                              children: [
-                                                Text(
+                                      backgroundColor: Colors.white,
+                                      shape: const RoundedRectangleBorder(
+                                        // Beveled yerine Rounded kullanabilirsin
+                                        borderRadius: BorderRadius.only(
+                                          topLeft: Radius.circular(10),
+                                          topRight: Radius.circular(10),
+                                        ),
+                                      ),
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return Container(
+                                          width: double
+                                              .infinity, // Genişliği ekran genişliği kadar yap
+                                          height: sc_height /
+                                              2, // Mevcut yüksekliği koru
+                                          padding: EdgeInsets.all(
+                                              16), // İç boşluk ekleyerek düzenli görünmesini sağla
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment
+                                                .start, // İçerikleri sola hizala
+                                            children: [
+                                              Center(
+                                                // Başlığı ortalamak için Center widget kullan
+                                                child: Text(
                                                   "Comments",
                                                   style: TextStyle(
-                                                      color: darkcolor,
-                                                      fontSize: 20,
-                                                      fontWeight:
-                                                          FontWeight.bold),
-                                                  textAlign: TextAlign.center,
+                                                    color: darkcolor,
+                                                    fontSize: 20,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
-                                                Text(
-                                                  "#cottonfashion #blueshirt #explore",
-                                                  style: TextStyle(
-                                                      color: darkcolor,
-                                                      fontSize: 18),
-                                                ),
-                                                Text(
-                                                  "#cottonfashion #blueshirt #explore",
-                                                  style: TextStyle(
-                                                      color: darkcolor,
-                                                      fontSize: 18),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        });
+                                              ),
+                                              SizedBox(height: 10),
+                                              Text(
+                                                "#cottonfashion #blueshirt #explore",
+                                                style: TextStyle(
+                                                    color: darkcolor,
+                                                    fontSize: 18),
+                                              ),
+                                              Text(
+                                                "#cottonfashion #blueshirt #explore",
+                                                style: TextStyle(
+                                                    color: darkcolor,
+                                                    fontSize: 18),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    );
                                   },
                                   icon: const Icon(
                                     Icons.comment_outlined,
@@ -560,18 +579,6 @@ class _HomePageState extends State<HomePage> {
                                   HomePagePosts[index].iconnumber.toString(),
                                   style: const TextStyle(
                                       color: Colors.white, fontSize: 12),
-                                ),
-                                SizedBox(
-                                  height: sc_height / 45,
-                                ),
-                                IconButton(
-                                  onPressed: () {},
-                                  icon: const Icon(
-                                    Icons.send,
-                                    color: Colors.white,
-                                  ),
-                                  iconSize: 25,
-                                  splashRadius: 10,
                                 ),
                                 SizedBox(
                                   height: sc_height / 45,
@@ -713,7 +720,8 @@ class _HomePageState extends State<HomePage> {
                         color: const Color.fromARGB(255, 220, 220, 220),
                         borderRadius: BorderRadius.circular(5),
                         image: DecorationImage(
-                            image: NetworkImage(HomePageDailies[index].dailyurl),
+                            image:
+                                NetworkImage(HomePageDailies[index].dailyurl),
                             fit: BoxFit.cover,
                             opacity: 0.5)),
                     //decoration: BoxDecoration(color: Colors.yellow, borderRadius:BorderRadius.circular(10)),
@@ -722,9 +730,10 @@ class _HomePageState extends State<HomePage> {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (context) => StoryPage(
-                              username: HomePageDailies[index].username,
-                              dailyurl: HomePageDailies[index].dailyurl,
-                              profilephotourl: HomePageDailies[index].profilephotourl),
+                                username: HomePageDailies[index].username,
+                                dailyurl: HomePageDailies[index].dailyurl,
+                                profilephotourl:
+                                    HomePageDailies[index].profilephotourl),
                           ),
                         );
                         Timer(const Duration(seconds: 3), () {
@@ -735,8 +744,8 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           CircleAvatar(
                             radius: sc_height / 20,
-                            backgroundImage:
-                                NetworkImage(HomePageDailies[index].profilephotourl),
+                            backgroundImage: NetworkImage(
+                                HomePageDailies[index].profilephotourl),
                           ),
                           Text(
                             HomePageDailies[index].username,

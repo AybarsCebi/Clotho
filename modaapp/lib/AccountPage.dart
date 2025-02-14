@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,6 +8,10 @@ import 'package:modaapp/HomePage.dart';
 import 'package:modaapp/LoginPage.dart';
 import 'package:modaapp/MiniBlogPage.dart';
 import 'constraints.dart';
+import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:file_picker/file_picker.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -23,7 +28,7 @@ class _AccountPageState extends State<AccountPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   User? _user;
   Map<String, dynamic>? _userData;
-
+  List<Map<String, dynamic>>? _userPosts;
   @override
   void initState() {
     super.initState();
@@ -35,9 +40,19 @@ class _AccountPageState extends State<AccountPage> {
     if (_user != null) {
       DocumentSnapshot userDoc =
           await _firestore.collection('users').doc(_user!.uid).get();
+      QuerySnapshot postSnapshot = await _firestore
+          .collection('users')
+          .doc(_user!.uid)
+          .collection('user_posts')
+          .get();
+      List<Map<String, dynamic>> posts = postSnapshot.docs
+          .map((doc) => doc.data() as Map<String, dynamic>)
+          .toList();
+
       if (userDoc.exists) {
         setState(() {
           _userData = userDoc.data() as Map<String, dynamic>?;
+          _userPosts = posts;
         });
         debugPrint("Posts: ${_userData?['posts']}");
       }
@@ -56,6 +71,87 @@ class _AccountPageState extends State<AccountPage> {
     }
   }
 
+  Future<void> cameraImageAndUpload() async {
+    final ImagePicker _picker = ImagePicker();
+    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+
+    if (image != null) {
+      File file = File(image.path);
+
+      // Firebase Storage'a yükleme
+      try {
+        String fileName = DateTime.now().millisecondsSinceEpoch.toString();
+        Reference ref =
+            FirebaseStorage.instance.ref().child('images/$fileName.jpg');
+        await ref.putFile(file);
+
+        String downloadURL = await ref.getDownloadURL();
+        debugPrint("Fotoğraf yüklendi: $downloadURL");
+
+        User? user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          DocumentReference userDoc =
+              FirebaseFirestore.instance.collection('users').doc(user.uid);
+
+          await userDoc.update({
+            "posts": FieldValue.arrayUnion([downloadURL])
+          });
+
+          debugPrint("Fotoğraf Firestore'a eklendi!");
+        } else {
+          debugPrint("Kullanıcı giriş yapmamış.");
+        }
+      } catch (e) {
+        debugPrint("Hata: $e");
+      }
+    }
+  }
+
+  Future<void> pickAndUploadImage(ImageSource source) async {
+    final ImagePicker _picker = ImagePicker();
+    final XFile? image = await _picker.pickImage(source: source);
+    UploadTask? uploadTask;
+    if (image != null) {
+      File file = File(image.path);
+
+      try {
+        String fileName = DateTime.now().millisecondsSinceEpoch.toString();
+        final ref =
+            FirebaseStorage.instance.ref().child('images/$fileName.jpg');
+        await ref.putFile(file);
+        final snapshot = await uploadTask!.whenComplete(() {});
+
+        String downloadURL = await ref.getDownloadURL();
+        debugPrint("Fotoğraf yüklendi: $downloadURL");
+
+        User? user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          DocumentReference userDoc =
+              FirebaseFirestore.instance.collection('users').doc(user.uid);
+
+          await userDoc.update({
+            "posts": FieldValue.arrayUnion([downloadURL])
+          });
+
+          debugPrint("Fotoğraf Firestore'a eklendi!");
+        } else {
+          debugPrint("Kullanıcı giriş yapmamış.");
+        }
+      } catch (e) {
+        debugPrint("Hata: $e");
+      }
+    }
+  }
+
+  void testStorageConnection() {
+    try {
+      final storage = FirebaseStorage.instance;
+      debugPrint("Firebase Storage bağlantısı başarılı: ${storage.app.name}");
+    } catch (e) {
+      debugPrint("Firebase Storage bağlantı hatası: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     double sc_height = MediaQuery.of(context).size.height;
@@ -64,6 +160,36 @@ class _AccountPageState extends State<AccountPage> {
     return SafeArea(
       child: Scaffold(
         backgroundColor: bckgrd,
+        floatingActionButton: SpeedDial(
+          childrenButtonSize: Size(sc_width / 6, sc_width / 6),
+          buttonSize: Size(sc_width / 6, sc_width / 6),
+          elevation: 5.0,
+          foregroundColor: bckgrd,
+          icon: Icons.add,
+          activeIcon: Icons.close,
+          backgroundColor: darkcolor,
+          children: [
+            SpeedDialChild(
+              shape: CircleBorder(),
+              foregroundColor: bckgrd,
+              child: Icon(Icons.camera_alt),
+              backgroundColor: darkcolor,
+              onTap: () {
+                cameraImageAndUpload();
+              },
+            ),
+            SpeedDialChild(
+              shape: CircleBorder(),
+              foregroundColor: bckgrd,
+              child: Icon(Icons.photo_library),
+              backgroundColor: darkcolor,
+              onTap: () {
+                // Galeri açma işlemi burada olacak
+                pickAndUploadImage(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
         body: _userData == null
             ? Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
@@ -93,7 +219,7 @@ class _AccountPageState extends State<AccountPage> {
                         Text(
                             "${(_userData!['followers']?.length ?? 0)}\n Followers",
                             textAlign: TextAlign.center),
-                        Text("${_userData!['posts']?.length ?? 0}\n Posts",
+                        Text("${_userPosts?.length ?? 0}\n Posts",
                             textAlign: TextAlign.center),
                         Text(
                             "${_userData!['following']?.length ?? 0}\n Followings",
@@ -107,8 +233,7 @@ class _AccountPageState extends State<AccountPage> {
                         TextButton(
                           onPressed: logOut,
                           style: ButtonStyle(
-                            backgroundColor:
-                                WidgetStatePropertyAll(darkcolor),
+                            backgroundColor: WidgetStatePropertyAll(darkcolor),
                             foregroundColor: WidgetStatePropertyAll(bckgrd),
                           ),
                           child: Text("Log Out"),
@@ -120,18 +245,17 @@ class _AccountPageState extends State<AccountPage> {
                       thickness: 0.5,
                     ),
                     GridView.count(
-                      mainAxisSpacing: sc_width/100,
-                      crossAxisSpacing: sc_width/100,
+                      crossAxisSpacing: sc_width / 200,
                       shrinkWrap: true,
-                      physics: NeverScrollableScrollPhysics(),
+                      physics: const NeverScrollableScrollPhysics(),
                       crossAxisCount: 3,
                       childAspectRatio: 0.6,
-                      children:
-                          (_userData!['posts'] ?? []).map<Widget>((photoUrl) {
+                      children: (_userPosts ?? []).map<Widget>((post) {
                         return ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: Image.network(
-                            photoUrl,
+                            post[
+                                'postUrl'], // Yeni veri yapısına uygun olarak postUrl kullanılıyor
                             fit: BoxFit.cover,
                             loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) return child;
@@ -139,8 +263,7 @@ class _AccountPageState extends State<AccountPage> {
                                   child: CircularProgressIndicator());
                             },
                             errorBuilder: (context, error, stackTrace) {
-                              print(
-                                  "Resim yüklenemedi: $error"); // Hata mesajı ekleme
+                              debugPrint("Resim yüklenemedi: $error");
                               return Container(
                                 color: Colors.grey,
                                 child: const Icon(Icons.broken_image,
@@ -150,7 +273,7 @@ class _AccountPageState extends State<AccountPage> {
                           ),
                         );
                       }).toList(),
-                    ),
+                    )
                   ],
                 ),
               ),

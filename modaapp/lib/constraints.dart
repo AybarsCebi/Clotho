@@ -105,3 +105,5 @@ class Saves{
 
 Color darkcolor=Color.fromARGB(255, 42, 42, 42);
 Color bckgrd = Color.fromARGB(255, 235, 235, 235);
+
+  String blank_profile_url ="https://firebasestorage.googleapis.com/v0/b/clotho-67236.appspot.com/o/images%2Fblank_profile_pic.jpg?alt=media&token=3bd92464-852d-47a1-8887-74331412bfff";

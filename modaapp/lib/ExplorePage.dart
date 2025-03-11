@@ -35,7 +35,7 @@ class _ExplorePageState extends State<ExplorePage> {
 
   Future<void> _loadExplorePosts() async {
     QuerySnapshot postSnapshot =
-        await _firestore.collection('explorepage_posts').get();
+        await _firestore.collection('all_posts').get();
 
     List<Map<String, dynamic>> posts = postSnapshot.docs
         .map((doc) => doc.data() as Map<String, dynamic>)

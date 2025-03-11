@@ -29,8 +29,6 @@ class _MenuState extends State<Menu> {
   final List<Widget> _pages = <Widget>[
     HomePage(),
     ExplorePage(),
-    AddPage(),
-    //MiniBlogPage(),
     AccountPage()
   ];
 
@@ -55,16 +53,6 @@ class _MenuState extends State<Menu> {
                 size: 27,
                 color: bckgrd,
               ),
-              Icon(
-                Icons.add,
-                size: 27,
-                color: bckgrd,
-              ),
-              /*Icon(
-                Icons.library_books,
-                size: 27,
-                color: bckgrd,
-              ),*/
               Icon(
                 Icons.account_circle_sharp,
                 size: 27,

@@ -6,7 +6,6 @@ import 'package:modaapp/AddPage.dart';
 import 'package:modaapp/ExplorePage.dart';
 import 'package:modaapp/HomePage.dart';
 import 'package:modaapp/LoginPage.dart';
-import 'package:modaapp/MiniBlogPage.dart';
 import 'constraints.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:image_picker/image_picker.dart';
@@ -21,7 +20,7 @@ class AccountPage extends StatefulWidget {
 }
 
 class _AccountPageState extends State<AccountPage> {
-  int _currentindex = 3;
+  int _currentindex = 2;
   var pages = [HomePage(), ExplorePage(), AddPage(), AccountPage()];
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -36,28 +35,33 @@ class _AccountPageState extends State<AccountPage> {
   }
 
   Future<void> _loadUserData() async {
-    _user = _auth.currentUser;
-    if (_user != null) {
-      DocumentSnapshot userDoc =
-          await _firestore.collection('users').doc(_user!.uid).get();
-      QuerySnapshot postSnapshot = await _firestore
-          .collection('users')
-          .doc(_user!.uid)
-          .collection('user_posts')
-          .get();
-      List<Map<String, dynamic>> posts = postSnapshot.docs
-          .map((doc) => doc.data() as Map<String, dynamic>)
-          .toList();
+  _user = _auth.currentUser;
+  if (_user != null) {
+    DocumentSnapshot userDoc =
+        await _firestore.collection('users').doc(_user!.uid).get();
+    if (userDoc.exists) {
+      String? username = userDoc.get('username');  
+      if (username != null) {
+        QuerySnapshot postSnapshot = await _firestore
+            .collection('all_posts')
+            .where('username', isEqualTo: username)
+            .get();
 
-      if (userDoc.exists) {
+        List<Map<String, dynamic>> posts = postSnapshot.docs
+            .map((doc) => doc.data() as Map<String, dynamic>)
+            .toList();
+
         setState(() {
           _userData = userDoc.data() as Map<String, dynamic>?;
           _userPosts = posts;
         });
-        debugPrint("Posts: ${_userData?['posts']}");
+
+        debugPrint("Kullanıcı Postları: $_userPosts");
       }
     }
   }
+}
+
 
   Future<void> logOut() async {
     try {
@@ -219,7 +223,7 @@ class _AccountPageState extends State<AccountPage> {
                         Text(
                             "${(_userData!['followers']?.length ?? 0)}\n Followers",
                             textAlign: TextAlign.center),
-                        Text("${_userPosts?.length ?? 0}\n Posts",
+                        Text("${_userData!['postnumber'] ?? 0}\n Posts",
                             textAlign: TextAlign.center),
                         Text(
                             "${_userData!['following']?.length ?? 0}\n Followings",
@@ -255,7 +259,7 @@ class _AccountPageState extends State<AccountPage> {
                           borderRadius: BorderRadius.circular(8),
                           child: Image.network(
                             post[
-                                'postUrl'], // Yeni veri yapısına uygun olarak postUrl kullanılıyor
+                                'postUrl'], 
                             fit: BoxFit.cover,
                             loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) return child;

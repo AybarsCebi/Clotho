@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:modaapp/AccountPage.dart';
 import 'package:modaapp/AddPage.dart';
@@ -94,17 +95,42 @@ class _HomePageState extends State<HomePage> {
   List<Post> HomePagePosts = [];
   List<Daily> HomePageDailies = [];
 
-  Future<List<Post>> fetchHomepagePosts() async {
-    try {
-      QuerySnapshot snapshot =
-          await FirebaseFirestore.instance.collection('homepageposts').get();
-      HomePagePosts =
-          snapshot.docs.map((doc) => Post.fromDocument(doc)).toList();
-      print("Fetched posts: ${HomePagePosts.length}");
-      return HomePagePosts;
-    } catch (e) {
-      print("Error fetching posts: $e");
-      return [];
+  List<Map<String, dynamic>> homepage_posts = [];
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  User? _user;
+  Map<String, dynamic>? _userData;
+
+  Future<void> _loadHomePagePosts() async {
+    _user = _auth.currentUser;
+    if (_user != null) {
+      DocumentSnapshot userDoc =
+          await _firestore.collection('users').doc(_user!.uid).get();
+
+      if (userDoc.exists) {
+        List<dynamic> followingList = userDoc.get('following') ?? [];
+
+        if (followingList.isNotEmpty) {
+          QuerySnapshot postSnapshot = await _firestore
+              .collection('all_posts')
+              .where('username', whereIn: followingList)
+              .get();
+
+          // Belge kimliğini (id) veriye ekliyoruz
+          List<Map<String, dynamic>> posts = postSnapshot.docs
+              .map((doc) => {
+                    ...doc.data() as Map<String, dynamic>,
+                    'postId': doc.id, // Belge kimliğini ekledik
+                  })
+              .toList();
+
+          setState(() {
+            _userData = userDoc.data() as Map<String, dynamic>?;
+            homepage_posts = posts;
+          });
+
+          debugPrint("Takip Edilen Kullanıcıların Postları: $homepage_posts");
+        }
+      }
     }
   }
 
@@ -122,29 +148,141 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  updatelike(String contentid, int num, bool durum) async {
-    if (durum == false) {
-      await _firestore
-          .doc('homepageposts/${contentid}')
-          .update({'likenumber': num + 1, 'islike': true});
-    } else {
-      await _firestore
-          .doc('homepageposts/${contentid}')
-          .update({'likenumber': num - 1, 'islike': false});
-    }
-  }
+  Future<void> updateLike(String postId, int index) async {
+  try {
+    DocumentReference postRef = _firestore.doc('all_posts/$postId');
+    String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-  updateicon(String contentid, int num, bool durum) async {
-    if (durum == false) {
-      await _firestore
-          .doc('homepageposts/$contentid')
-          .update({'iconnumber': num + 1, 'isicon': true});
-    } else {
-      await _firestore
-          .doc('homepageposts/$contentid')
-          .update({'iconnumber': num - 1, 'isicon': false});
-    }
+    if (userId.isEmpty) return;
+
+    // Kullanıcı adı bilgisi için kullanıcı verisini çek
+    DocumentSnapshot userDoc = await _firestore.collection('users').doc(userId).get();
+    String username = userDoc.get('username') ?? 'Anonim';
+
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      DocumentSnapshot snapshot = await transaction.get(postRef);
+
+      if (!snapshot.exists) return;
+
+      int currentLikes = snapshot.get('likenumber') ?? 0;
+
+      // Beğenilip beğenilmediğini kontrol et
+      List<dynamic> likedByList = snapshot.get('likedby') ?? [];
+      bool isLiked = likedByList.any((item) {
+        if (item is Map<String, dynamic>) {
+          return item['userId'] == userId;
+        }
+        return false;
+      });
+
+      if (isLiked) {
+        // Mevcut kullanıcıyı "likedby" listesinden çıkar
+        likedByList.removeWhere((item) {
+          if (item is Map<String, dynamic>) {
+            return item['userId'] == userId;
+          }
+          return false;
+        });
+        transaction.update(postRef, {
+          'likenumber': currentLikes - 1,
+          'likedby': likedByList,
+        });
+
+        // Local state'i güncelle
+        setState(() {
+          homepage_posts[index]['likenumber'] = currentLikes - 1;
+          homepage_posts[index]['likedby'] = likedByList;
+        });
+
+      } else {
+        // Yeni beğeni yap
+        likedByList.add({'userId': userId, 'username': username});
+        transaction.update(postRef, {
+          'likenumber': currentLikes + 1,
+          'likedby': likedByList,
+        });
+
+        // Local state'i güncelle
+        setState(() {
+          homepage_posts[index]['likenumber'] = currentLikes + 1;
+          homepage_posts[index]['likedby'] = likedByList;
+        });
+      }
+    });
+
+    debugPrint("Beğeni güncellendi.");
+  } catch (e) {
+    debugPrint("Hata: $e");
   }
+}
+
+
+Future<void> updateIcon(String postId, int index) async {
+  try {
+    DocumentReference postRef = _firestore.doc('all_posts/$postId');
+    String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    if (userId.isEmpty) return;
+
+    DocumentSnapshot userDoc = await _firestore.collection('users').doc(userId).get();
+    String username = userDoc.get('username') ?? 'Anonim';
+
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      DocumentSnapshot snapshot = await transaction.get(postRef);
+
+      if (!snapshot.exists) return;
+
+      int currentIcons = snapshot.get('iconnumber') ?? 0;
+
+      List<dynamic> iconbyList = snapshot.get('iconby') ?? [];
+      bool isIcon = iconbyList.any((item) {
+        if (item is Map<String, dynamic>) {
+          return item['userId'] == userId;
+        }
+        return false;
+      });
+
+      if (isIcon) {
+        // Mevcut kullanıcıyı "likedby" listesinden çıkar
+        iconbyList.removeWhere((item) {
+          if (item is Map<String, dynamic>) {
+            return item['userId'] == userId;
+          }
+          return false;
+        });
+        transaction.update(postRef, {
+          'iconnumber': currentIcons - 1,
+          'iconby': iconbyList,
+        });
+
+        // Local state'i güncelle
+        setState(() {
+          homepage_posts[index]['iconnumber'] = currentIcons - 1;
+          homepage_posts[index]['iconby'] = iconbyList;
+        });
+
+      } else {
+        // Yeni beğeni yap
+        iconbyList.add({'userId': userId, 'username': username});
+        transaction.update(postRef, {
+          'iconnumber': currentIcons + 1,
+          'iconby': iconbyList,
+        });
+
+        // Local state'i güncelle
+        setState(() {
+          homepage_posts[index]['iconnumber'] = currentIcons + 1;
+          homepage_posts[index]['iconby'] = iconbyList;
+        });
+      }
+    });
+
+    debugPrint("Icon güncellendi.");
+  } catch (e) {
+    debugPrint("Hata: $e");
+  }
+}
+
 
   updatefollow(String contentid, bool durum) async {
     if (durum == false) {
@@ -163,8 +301,8 @@ class _HomePageState extends State<HomePage> {
   var pages = [
     HomePage(),
     const ExplorePage(),
-    const AddPage(),
-    const MiniBlogPage(),
+    //const AddPage(),
+    //const MiniBlogPage(),
     const AccountPage()
   ];
 
@@ -180,7 +318,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    fetchHomepagePosts();
+    _loadHomePagePosts();
     fetchHomepageDailies();
   }
 
@@ -275,96 +413,73 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  FutureBuilder<List<Post>> homepageposts(double sc_width, double sc_height) {
-    return FutureBuilder<List<Post>>(
-        future: fetchHomepagePosts(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return const Text('Something went wrong');
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              setState(() {
-                fetchHomepagePosts();
-              });
-            },
-            child: ListView.builder(
+  RefreshIndicator homepageposts(double sc_width, double sc_height) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() {
+          _loadHomePagePosts();
+        });
+      },
+      child: homepage_posts.isEmpty
+          ? Center(
+              child: Text("Takip ettiğiniz kişilerin gönderisi bulunamadı."))
+          : ListView.builder(
               key: const PageStorageKey<String>('homepage'),
-              itemCount: HomePagePosts.length,
+              itemCount: homepage_posts.length,
               itemBuilder: (context, index) {
                 return Center(
-                  child: Column(
-                    children: [
-                      SizedBox(height: sc_height / 100),
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(sc_width / 35, 0,
-                            sc_width / 35, 0), //eskisi sc_width/40
-                        child: Container(
-                          height: sc_height / 20,
-                          decoration: const BoxDecoration(
-                              color: Color.fromARGB(255, 200, 200, 200),
-                              borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(16),
-                                  topRight: Radius.circular(16))),
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: sc_width / 30,
-                              ),
-                              CircleAvatar(
-                                backgroundImage: NetworkImage(
-                                    HomePagePosts[index].profilephotourl),
-                                //AssetImage("images/ticklogo.png"),
-                                radius: sc_height / 70,
-                              ),
-                              SizedBox(
-                                width: sc_width / 50,
-                              ),
-                              TextButton(
-                                onPressed: () {},
-                                style: const ButtonStyle(
-                                  overlayColor: WidgetStatePropertyAll(
-                                      Colors.transparent),
-                                ),
-                                child: Text(
-                                  HomePagePosts[index].username,
-                                  style: const TextStyle(color: Colors.black),
-                                ),
-                              ),
-                              const Image(
-                                  image: AssetImage("images/ticklogo.png"),
-                                  width: 15),
-                              TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    updatefollow(HomePagePosts[index].id,
-                                        HomePagePosts[index].isfollow);
-                                  });
-                                },
-                                style: const ButtonStyle(
-                                  overlayColor: WidgetStatePropertyAll(
-                                      Colors.transparent),
-                                ),
-                                child: (HomePagePosts[index].isfollow == false)
-                                    ? const Text(
-                                        "Follow",
-                                        style: TextStyle(color: Colors.black),
-                                      )
-                                    : const Text(
-                                        "Following",
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                              )
-                            ],
+                    child: Column(
+                  children: [
+                    SizedBox(height: sc_height / 100),
+                    Container(
+                      width: sc_width * 0.94,
+                      height: sc_height / 20,
+                      decoration: const BoxDecoration(
+                          color: Color.fromARGB(255, 200, 200, 200),
+                          borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(16),
+                              topRight: Radius.circular(16))),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: sc_width / 30,
                           ),
-                        ),
+                          CircleAvatar(
+                            backgroundImage: NetworkImage(
+                                (_userData?['profilepic'] != null)
+                                    ? _userData!['profilepic']
+                                    : blank_profile_url),
+                            //AssetImage("images/ticklogo.png"),
+                            radius: sc_height / 70,
+                          ),
+                          SizedBox(
+                            width: sc_width / 50,
+                          ),
+                          TextButton(
+                            onPressed: () {},
+                            style: const ButtonStyle(
+                              overlayColor:
+                                  WidgetStatePropertyAll(Colors.transparent),
+                            ),
+                            child: Text(
+                              homepage_posts[index]['username'],
+                              style: const TextStyle(color: Colors.black),
+                            ),
+                          ),
+                          /*TextButton(
+                              onPressed: () {
+                              },
+                              style: const ButtonStyle(
+                                overlayColor: WidgetStatePropertyAll(
+                                    Colors.transparent),
+                              ),
+                              child: Text("Follow")      
+                            )*/
+                        ],
                       ),
-                      Stack(children: [
+                    ),
+                    Stack(
+                      children: [
                         Center(
                           child: Container(
                             decoration: BoxDecoration(
@@ -373,24 +488,15 @@ class _HomePageState extends State<HomePage> {
                                     bottomRight: Radius.circular(16)),
                                 image: DecorationImage(
                                     image: NetworkImage(
-                                        HomePagePosts[index].contenturl),
+                                        homepage_posts[index]['postUrl'] ?? ""),
                                     //image: AssetImage("images/ticklogo.png"),
                                     fit: BoxFit.cover)),
                             width: (MediaQuery.of(context).size.width) *
-                                9.4 /
-                                10, //eskisi 9.5
-                            height:
-                                (MediaQuery.of(context).size.height) * 6.4 / 10,
+                                0.94, //eskisi 9.5
+                            height: (MediaQuery.of(context).size.height) * 0.65,
                             child: FilledButton(
                               onPressed: () {},
-                              onLongPress: () {
-                                setState(() {
-                                  updatelike(
-                                      HomePagePosts[index].id,
-                                      HomePagePosts[index].likenumber,
-                                      HomePagePosts[index].islike);
-                                });
-                              },
+                              onLongPress: () {},
                               child: null,
                               style: ButtonStyle(
                                 backgroundColor: const WidgetStatePropertyAll(
@@ -422,36 +528,9 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                         ),
-                        /*Padding(                                                       //play button
-                        padding: EdgeInsets.fromLTRB(
-                            sc_width * 3.5 / 10, sc_height / 4, 0, 0), //eskisi 8
-                        child: IconButton(
-                          color: Colors.white,
-                          onPressed: () {
-                            setState(() {
-                              saved = !saved;
-                            });
-                          },
-                          icon: Icon(Icons.play_circle),
-                          iconSize: sc_width / 5,
-                        ),
-                      ),*/
-
-                        /*Padding(padding: EdgeInsets.fromLTRB(sc_width/40, sc_height*5.8/10, 0, 0),
-                        child: Container(
-                          width: sc_width*7.5/10,
-                          height:sc_height*5/100,
-                          decoration: BoxDecoration(
-                            color: const Color.fromARGB(55, 0, 0, 0),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Text("     ################", style: TextStyle(color: Colors.white),),
-                        ),
-                      ),*/
-
                         Padding(
                           padding: EdgeInsets.fromLTRB(sc_width * 8.2 / 10,
-                              sc_height / 6.6, 0, 0), //eskisi 8
+                              sc_height / 6, 0, 0), //eskisi 8
                           child: Container(
                             width: sc_width / 8,
                             decoration: BoxDecoration(
@@ -461,21 +540,50 @@ class _HomePageState extends State<HomePage> {
                             child: Column(
                               children: [
                                 IconButton(
-                                    splashRadius: 10,
-                                    iconSize: 25,
-                                    onPressed: () {
-                                      setState(() {
-                                        updatelike(
-                                            HomePagePosts[index].id,
-                                            HomePagePosts[index].likenumber,
-                                            HomePagePosts[index].islike);
-                                      });
-                                    },
-                                    icon: (HomePagePosts[index].islike == true)
-                                        ? like
-                                        : unlike),
+                                  splashRadius: 10,
+                                  iconSize: 25,
+                                  onPressed: () {
+                                    final postId =
+                                        homepage_posts[index]['postId'];
+                                    if (postId != null && postId is String) {
+                                      updateLike(postId, index);
+                                    } else {
+                                      debugPrint("Geçersiz veya boş Post ID!");
+                                    }
+                                  },
+                                  icon: Icon(
+                                    homepage_posts[index]['likedby']?.any(
+                                                (item) =>
+                                                    item is Map<String,
+                                                        dynamic> &&
+                                                    item['userId'] ==
+                                                        FirebaseAuth
+                                                            .instance
+                                                            .currentUser
+                                                            ?.uid) ??
+                                            false
+                                        ? Icons
+                                            .favorite 
+                                        : Icons
+                                            .favorite_border, 
+                                    color: homepage_posts[index]['likedby']
+                                                ?.any((item) =>
+                                                    item is Map<String,
+                                                        dynamic> &&
+                                                    item['userId'] ==
+                                                        FirebaseAuth
+                                                            .instance
+                                                            .currentUser
+                                                            ?.uid) ??
+                                            false
+                                        ? Colors.red // Beğenilmişse kırmızı
+                                        : Colors.white, // Beğenilmemişse beyaz
+                                  ),
+                                ),
                                 Text(
-                                  HomePagePosts[index].likenumber.toString(),
+                                  homepage_posts[index]['likenumber']
+                                          ?.toString() ??
+                                      '0',
                                   style: const TextStyle(
                                       color: Colors.white, fontSize: 12),
                                 ),
@@ -545,7 +653,9 @@ class _HomePageState extends State<HomePage> {
                                   color: Colors.black,
                                 ),
                                 Text(
-                                  HomePagePosts[index].commentnumber.toString(),
+                                  homepage_posts[index]['comments']
+                                      .length
+                                      .toString(),
                                   style: const TextStyle(
                                       color: Colors.white, fontSize: 12),
                                 ),
@@ -556,27 +666,48 @@ class _HomePageState extends State<HomePage> {
                                   splashRadius: 10,
                                   iconSize: 25,
                                   onPressed: () {
-                                    setState(() {
-                                      updateicon(
-                                          HomePagePosts[index].id,
-                                          HomePagePosts[index].iconnumber,
-                                          HomePagePosts[index].isicon);
-                                    });
+                                    final postId =
+                                        homepage_posts[index]['postId'];
+                                    if (postId != null && postId is String) {
+                                      updateIcon(postId, index);
+                                    } else {
+                                      debugPrint("Geçersiz veya boş Post ID!");
+                                    }
                                   },
-                                  icon: (HomePagePosts[index].isicon == false)
-                                      ? const Icon(
-                                          Icons.star_border_outlined,
-                                          color: Colors.white,
-                                        )
-                                      : const Icon(
-                                          Icons.star,
-                                          color:
-                                              Color.fromARGB(255, 228, 219, 54),
-                                        ),
-                                  color: Colors.black,
+                                  icon: Icon(
+                                    homepage_posts[index]['iconby']?.any(
+                                                (item) =>
+                                                    item is Map<String,
+                                                        dynamic> &&
+                                                    item['userId'] ==
+                                                        FirebaseAuth
+                                                            .instance
+                                                            .currentUser
+                                                            ?.uid) ??
+                                            false
+                                        ? Icons
+                                            .star
+                                        : Icons
+                                            .star_border, 
+                                    color: homepage_posts[index]['iconby']
+                                                ?.any((item) =>
+                                                    item is Map<String,
+                                                        dynamic> &&
+                                                    item['userId'] ==
+                                                        FirebaseAuth
+                                                            .instance
+                                                            .currentUser
+                                                            ?.uid) ??
+                                            false
+                                        ? Colors.yellow // Beğenilmişse kırmızı
+                                        : Colors.white, // Beğenilmemişse beyaz
+                                  ),
+                                  
                                 ),
                                 Text(
-                                  HomePagePosts[index].iconnumber.toString(),
+                                  homepage_posts[index]['iconnumber']
+                                          ?.toString() ??
+                                      '0',
                                   style: const TextStyle(
                                       color: Colors.white, fontSize: 12),
                                 ),
@@ -598,7 +729,7 @@ class _HomePageState extends State<HomePage> {
                                           content: Padding(
                                             padding: const EdgeInsets.all(2.0),
                                             child: Text(
-                                                "Üst: ${HomePagePosts[index].outfitupper}\nAlt: ${HomePagePosts[index].outfitlower}\nAyakkabı: ${HomePagePosts[index].outfitshoes}\nAksesuar: ${HomePagePosts[index].outfitaccesories}",
+                                                homepage_posts[index]['detail'],
                                                 style:
                                                     GoogleFonts.dancingScript(
                                                         fontSize: 24,
@@ -608,7 +739,7 @@ class _HomePageState extends State<HomePage> {
                                             TextButton(
                                               style: const ButtonStyle(
                                                 overlayColor:
-                                                    MaterialStatePropertyAll(
+                                                    WidgetStatePropertyAll(
                                                         Colors.transparent),
                                               ),
                                               child: Text(
@@ -636,59 +767,17 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                         ),
-
-                        /*Padding(
-                        padding:
-                            EdgeInsets.fromLTRB(sc_width / 50, sc_height*60/100, 0, 0),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Color.fromARGB(55, 0, 0, 0),
-                            borderRadius: BorderRadius.circular(10)
-                          ),
-                          height: sc_height/15,
-                          width: sc_width*9.1/10,
-                          
-                          child: Padding(
-                            padding: const EdgeInsets.only(left:5, top: 8),
-                            child: Text("#streetstyle#cottonstyle#suit",style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),),
-                          ),
-                        ),
-                      ),*/
-                      ]),
-                      /*Padding(                                                     //comment part
-                        padding: EdgeInsets.fromLTRB(sc_width / 35, 0,
-                            sc_width / 35, 0), //eskisi sc_width/40
-                        child: Container(
-                          height: sc_height / 20,
-                          decoration: const BoxDecoration(
-                              color: Color.fromARGB(255, 200, 200, 200),
-                              borderRadius: BorderRadius.only(
-                                  bottomLeft: Radius.circular(16),
-                                  bottomRight: Radius.circular(16))),
-                          child: const Padding(
-                            padding: EdgeInsets.all(5.0),
-                            child: Text("Caption: At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident, similique sunt",
-                              overflow: TextOverflow
-                                  .ellipsis, // Metin sığmazsa "..." ekleyecek
-                              maxLines: 2, // Metin kaç satıra kadar sığacak
-                              
-                              style: TextStyle(
-                                  fontSize: 13), // Metin boyutunu ayarlamak için
-                            ),
-                          ),
-                        )),*/
-                      SizedBox(height: sc_height / 100),
-                      Divider(
-                        thickness: 1,
-                        height: sc_height / 80,
-                      ),
-                    ],
-                  ),
-                );
+                        SizedBox(height: sc_height / 100),
+                      ],
+                    ),
+                    Divider(
+                      thickness: 0.8,
+                    ),
+                  ],
+                ));
               },
             ),
-          );
-        });
+    );
   }
 
   FutureBuilder<List<Daily>> homepagedailys(double sc_width, double sc_height) {
@@ -763,68 +852,3 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*BottomNavigationBar(
-          fixedColor: Colors.black,
-          currentIndex: _currentindex,
-          onTap: (int newindex) {
-            setState(() {
-              _currentindex = newindex;
-
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => pages[_currentindex],
-                ),
-              );
-            });
-          },
-          items: [
-            BottomNavigationBarItem(
-                label: 'Home',
-                icon: const Icon(
-                  Icons.home_filled,
-                  color: Colors.black,
-                ),
-                backgroundColor: bckgrd),
-            BottomNavigationBarItem(
-                label: 'Explore',
-                icon: const Icon(
-                  Icons.search,
-                  color: Colors.black,
-                ),
-                backgroundColor: bckgrd),
-            BottomNavigationBarItem(
-                label: 'Add',
-                icon: const Icon(
-                  Icons.add,
-                  color: Colors.black,
-                ),
-                backgroundColor: bckgrd),
-            BottomNavigationBarItem(
-                label: 'Minilog',
-                icon: const Icon(
-                  Icons.library_books,
-                  color: Colors.black,
-                ),
-                backgroundColor: bckgrd),
-            BottomNavigationBarItem(
-                label: 'Profile',
-                icon: const Icon(
-                  Icons.account_circle_sharp,
-                  color: Colors.black,
-                ),
-                backgroundColor: bckgrd),
-          ],
-        )*/

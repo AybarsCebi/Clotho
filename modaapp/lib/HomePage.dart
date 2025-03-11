@@ -15,56 +15,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 final pageBucket = PageStorageBucket();
 
-class Post {
-  String contenturl,
-      outfitaccesories,
-      outfitlower,
-      outfitshoes,
-      outfitupper,
-      profilephotourl,
-      username,
-      id;
-  int commentnumber, iconnumber, likenumber;
-  bool isexpert, isfollow, islike, isicon;
-  Post({
-    required this.id,
-    required this.commentnumber,
-    required this.contenturl,
-    required this.iconnumber,
-    required this.isexpert,
-    required this.isfollow,
-    required this.islike,
-    required this.likenumber,
-    required this.outfitaccesories,
-    required this.outfitlower,
-    required this.outfitshoes,
-    required this.outfitupper,
-    required this.profilephotourl,
-    required this.username,
-    required this.isicon,
-  });
-
-  factory Post.fromDocument(DocumentSnapshot doc) {
-    return Post(
-      id: doc.id,
-      commentnumber: doc['commentnumber'],
-      iconnumber: doc['iconnumber'],
-      isexpert: doc['isexpert'],
-      likenumber: doc['likenumber'],
-      outfitaccesories: doc['outfitaccesories'],
-      outfitlower: doc['outfitlower'],
-      outfitshoes: doc['outfitshoes'],
-      outfitupper: doc['outfitupper'],
-      profilephotourl: doc['profilephotourl'],
-      username: doc['username'],
-      contenturl: doc['contenturl'],
-      isfollow: doc['isfollow'],
-      islike: doc['islike'],
-      isicon: doc['isicon'],
-    );
-  }
-}
-
 class Daily {
   String profilephotourl, username, dailyurl, id;
 
@@ -92,7 +42,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  List<Post> HomePagePosts = [];
   List<Daily> HomePageDailies = [];
 
   List<Map<String, dynamic>> homepage_posts = [];
@@ -115,7 +64,6 @@ class _HomePageState extends State<HomePage> {
               .where('username', whereIn: followingList)
               .get();
 
-          // Belge kimliğini (id) veriye ekliyoruz
           List<Map<String, dynamic>> posts = postSnapshot.docs
               .map((doc) => {
                     ...doc.data() as Map<String, dynamic>,
@@ -166,7 +114,6 @@ class _HomePageState extends State<HomePage> {
 
       int currentLikes = snapshot.get('likenumber') ?? 0;
 
-      // Beğenilip beğenilmediğini kontrol et
       List<dynamic> likedByList = snapshot.get('likedby') ?? [];
       bool isLiked = likedByList.any((item) {
         if (item is Map<String, dynamic>) {
@@ -176,7 +123,6 @@ class _HomePageState extends State<HomePage> {
       });
 
       if (isLiked) {
-        // Mevcut kullanıcıyı "likedby" listesinden çıkar
         likedByList.removeWhere((item) {
           if (item is Map<String, dynamic>) {
             return item['userId'] == userId;
@@ -195,7 +141,6 @@ class _HomePageState extends State<HomePage> {
         });
 
       } else {
-        // Yeni beğeni yap
         likedByList.add({'userId': userId, 'username': username});
         transaction.update(postRef, {
           'likenumber': currentLikes + 1,
@@ -283,37 +228,13 @@ Future<void> updateIcon(String postId, int index) async {
   }
 }
 
-
-  updatefollow(String contentid, bool durum) async {
-    if (durum == false) {
-      await _firestore
-          .doc('homepageposts/$contentid')
-          .update({'isfollow': true});
-    } else {
-      await _firestore
-          .doc('homepageposts/$contentid')
-          .update({'isfollow': false});
-    }
-  }
-
   bool saved = false;
 
   var pages = [
     HomePage(),
     const ExplorePage(),
-    //const AddPage(),
-    //const MiniBlogPage(),
     const AccountPage()
   ];
-
-  Widget unlike = const Icon(
-    Icons.favorite_border_outlined,
-    color: Colors.white,
-  );
-  Widget like = const Icon(
-    Icons.favorite,
-    color: Colors.red,
-  );
 
   @override
   void initState() {
@@ -331,38 +252,6 @@ Future<void> updateIcon(String postId, int index) async {
         length: 2,
         child: Scaffold(
           backgroundColor: bckgrd,
-          /*drawer: Drawer(
-            width: sc_width / 3.8,
-            child: ListView.builder(
-              scrollDirection: Axis.vertical,
-              itemCount: 10, // total number of items
-              itemBuilder: (context, index) {
-                return SizedBox(
-                  width: sc_width / 4.2,
-                  child: MaterialButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => StoryPage(account: index),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      //width: double.infinity,
-                      height: sc_width / 4.2,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        image: DecorationImage(
-                            image: AssetImage('images/post$index.jpg'),
-                            fit: BoxFit.cover),
-                        color: Colors.blue,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),*/
           appBar: AppBar(
             toolbarHeight: sc_height / 18,
             automaticallyImplyLeading: false,
@@ -372,16 +261,6 @@ Future<void> updateIcon(String postId, int index) async {
               style:
                   GoogleFonts.dancingScript(color: Colors.black, fontSize: 38),
             ),
-            /*leading: Builder(builder: (context) {
-              return IconButton(
-                  icon: Icon(
-                    Icons.menu,
-                    color: darkcolor,
-                  ),
-                  onPressed: () {
-                    Scaffold.of(context).openDrawer();
-                  });
-            }),*/
             backgroundColor: bckgrd,
             centerTitle: true,
             bottom: TabBar(
@@ -449,7 +328,6 @@ Future<void> updateIcon(String postId, int index) async {
                                 (_userData?['profilepic'] != null)
                                     ? _userData!['profilepic']
                                     : blank_profile_url),
-                            //AssetImage("images/ticklogo.png"),
                             radius: sc_height / 70,
                           ),
                           SizedBox(
@@ -466,15 +344,6 @@ Future<void> updateIcon(String postId, int index) async {
                               style: const TextStyle(color: Colors.black),
                             ),
                           ),
-                          /*TextButton(
-                              onPressed: () {
-                              },
-                              style: const ButtonStyle(
-                                overlayColor: WidgetStatePropertyAll(
-                                    Colors.transparent),
-                              ),
-                              child: Text("Follow")      
-                            )*/
                         ],
                       ),
                     ),
@@ -576,8 +445,8 @@ Future<void> updateIcon(String postId, int index) async {
                                                             .currentUser
                                                             ?.uid) ??
                                             false
-                                        ? Colors.red // Beğenilmişse kırmızı
-                                        : Colors.white, // Beğenilmemişse beyaz
+                                        ? Colors.red 
+                                        : Colors.white, 
                                   ),
                                 ),
                                 Text(
@@ -699,8 +568,8 @@ Future<void> updateIcon(String postId, int index) async {
                                                             .currentUser
                                                             ?.uid) ??
                                             false
-                                        ? Colors.yellow // Beğenilmişse kırmızı
-                                        : Colors.white, // Beğenilmemişse beyaz
+                                        ? Colors.yellow 
+                                        : Colors.white, 
                                   ),
                                   
                                 ),
@@ -813,7 +682,6 @@ Future<void> updateIcon(String postId, int index) async {
                                 NetworkImage(HomePageDailies[index].dailyurl),
                             fit: BoxFit.cover,
                             opacity: 0.5)),
-                    //decoration: BoxDecoration(color: Colors.yellow, borderRadius:BorderRadius.circular(10)),
                     child: ListTile(
                       onTap: () {
                         Navigator.of(context).push(
